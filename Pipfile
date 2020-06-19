@@ -10,6 +10,7 @@ google-api-python-client = "*"
 google-auth-httplib2 = "*"
 google-auth-oauthlib = "*"
 python-dateutil = "*"
+python-vlc = "*"
 
 [requires]
-python_version = "3.8"
+python_version = "3.7"

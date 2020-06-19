@@ -7,12 +7,25 @@ import pprint
 import os.path
 import time
 import subprocess
+import vlc
+import smtplib
+import json
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
+# Google Calendar Variables
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+
+# Email Variables
+SMTP_SERVER = 'smtp.gmail.com' # Email Server
+SMTP_PORT = 587 # Server Port
+email_creds = json.load(
+    open("email_credentials.json"), object_pairs_hook=dict)
+GMAIL_USERNAME = email_creds["GMAIL_USERNAME"]
+GMAIL_PASSWORD = email_creds["GMAIL_PASSWORD"]
+
 
 def build_calendar():
     """Get the credentials and create calendar."""
@@ -93,7 +106,57 @@ def get_next_event(service, calendar_id, event_summary):
 
 def alarm():
     # subprocess.check_output(['bash', 'play_radio.sh'])
-    pass
+    try:
+        smartplug(True)
+    except Exception:
+        print("Unable to turn on smart plug.")
+    
+    try:
+        player = vlc.MediaPlayer("eight.mp3")
+        player.play()
+    except Exception:
+        print("Unable to play music via VLC.")
+    
+    time.sleep(10)
+
+
+def send_email(recipient, subject, content=''):
+    """Send an email."""
+    # Create headers
+    headers = ["From: " + GMAIL_USERNAME, "Subject: " + subject, "To: " + recipient,
+                               "MIME-Version: 1.0", "Content-Type: text/html"]
+    headers = "\r\n".join(headers)
+    
+    try:
+        # Connect to Gmail Server
+        session = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        session.ehlo()
+        session.starttls()
+        session.ehlo()
+
+        # Login to Gmail
+        session.login(GMAIL_USERNAME, GMAIL_PASSWORD)
+
+        # Send email, then quit
+        session.sendmail(GMAIL_USERNAME, recipient, headers + "\r\n\r\n" + content)
+        session.quit
+
+        return True
+
+    except Exception:
+        return False
+ 
+
+def smartplug(on=True):
+    """Turn smart plug on/off by sending email."""
+    if on:
+        subject = '#smartplugon'
+    elif not on:
+        subject = '#smartplugoff'
+    else:
+        return False
+    
+    return send_email(recipient='trigger@applet.ifttt.com', subject=subject)
 
 
 def main():
@@ -121,10 +184,10 @@ def main():
         zero_time = datetime.timedelta(seconds=0)
         if time_diff < threshold_time_diff and time_diff > zero_time:
             print("ALARM RAISED!")
+            alarm()
         time.sleep(3)
-
-
 
 
 if __name__ == '__main__':
     main()
+    
