@@ -11,6 +11,7 @@ google-auth-httplib2 = "*"
 google-auth-oauthlib = "*"
 python-dateutil = "*"
 python-vlc = "*"
+pyserial = "*"
 
 [requires]
 python_version = "3.7"

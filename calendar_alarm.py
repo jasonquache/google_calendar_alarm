@@ -10,13 +10,14 @@ import subprocess
 import vlc
 import smtplib
 import json
+import serial
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
 # Google Calendar Variables
 # If modifying these scopes, delete the file token.pickle.
-SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 # Email Variables
 SMTP_SERVER = 'smtp.gmail.com' # Email Server
@@ -82,9 +83,9 @@ def get_next_event(service, calendar_id, event_summary):
     events_result = service.events().list(calendarId=calendar_id, timeMin=now,
                                         maxResults=50, singleEvents=True,
                                         orderBy='startTime').execute()
-    print("Events result type", type(events_result))
+    # print("Events result type", type(events_result))
     events = events_result.get('items', [])
-    print("Events type ", type(events))
+    # print("Events type ", type(events))
 
     if not events:
         print('No upcoming events found.')
@@ -100,24 +101,49 @@ def get_next_event(service, calendar_id, event_summary):
             evt_datetime_obj = dtparse(start)
             # Print event summary with start time
             print("{} at {}".format(evt_summary, evt_datetime_str))
-            # Return the date and time
-            return evt_datetime_obj
+            # Return the datetime obj and the event id
+            return evt_datetime_obj, event['id']
 
+def update_next_event(service, calendar_id, event_id, new_summary):
+    """Append new_summary to summary of specified event."""
+    # Get event from API
+    event = service.events().get(calendarId=calendar_id, eventId=event_id).execute()
+    # Modify event summary (append new_summary to start)
+    prev_evt_summary = event['summary']
+    event['summary'] = "{} {}".format(new_summary, prev_evt_summary)
+    updated_event = service.events().update(calendarId=calendar_id, eventId=event['id'], body=event).execute()
 
-def alarm():
-    # subprocess.check_output(['bash', 'play_radio.sh'])
+    return True
+
+def alarm(serial_connection):
+    ser = serial_connection
     try:
         smartplug(True)
     except Exception:
         print("Unable to turn on smart plug.")
     
     try:
-        player = vlc.MediaPlayer("eight.mp3")
+        subprocess.call(["bash", "configure_audio.sh"])
+        # player = vlc.MediaPlayer("eight.mp3")
+        player = vlc.MediaPlayer("http://bbcmedia.ic.llnwd.net/stream/bbcmedia_radio1_mf_p")
         player.play()
     except Exception:
         print("Unable to play music via VLC.")
-    
-    time.sleep(10)
+
+    # Show message on LCD
+    msg = "--WAKE UP NOW!--"
+    ser.write(msg.encode('utf-8'))
+
+    # Alarm lasts for at least 5 seconds before accepting stop button
+    time.sleep(5)
+    while True:
+        if ser.in_waiting > 0:
+            line = ser.readline().decode('utf-8').rstrip()
+            if line == "State changed from LOW to HIGH":
+                # Button pressed so stop alarm
+                player.stop()
+                smartplug(False)
+                return True
 
 
 def send_email(recipient, subject, content=''):
@@ -144,6 +170,7 @@ def send_email(recipient, subject, content=''):
         return True
 
     except Exception:
+        print("Email error!")
         return False
  
 
@@ -159,18 +186,38 @@ def smartplug(on=True):
     return send_email(recipient='trigger@applet.ifttt.com', subject=subject)
 
 
+def connect_arduino():
+    """Find Arduino port and return serial object."""
+    # Serial connection
+    for i in range(10):
+        try:
+            port = '/dev/ttyACM' + str(i)
+            ser = serial.Serial(port, 9600, timeout=1)
+            ser.flush()
+            print("Successfully connected to Arduino on port {}".format(port))
+            return ser
+        except serial.serialutil.SerialException:
+            pass
+    
+    # If not port found, return None
+    return None
+        
+
 def main():
     """Shows basic usage of the Google Calendar API.
     Prints the start and name of the next 10 events on the user's calendar.
     """
-    service = build_calendar()
+    cal_service = build_calendar()
 
-    # Call the API to list all events in 'Daily Scheduling' calendar
+    # 'Daily Scheduling' Google Calendar
     calendar_id = "fcmfp298b0pd6a5rc27opganqs@group.calendar.google.com"
 
-    # Check every 3 seconds
-    while True:
-        next_wake_datetime = get_next_event(service, calendar_id, 'Wake')
+    # Serial connection
+    serial_service = connect_arduino()
+
+    # Check every 0.5 seconds
+    while True:        
+        next_wake_datetime, event_id = get_next_event(cal_service, calendar_id, 'Wake')
         next_wake_datetime_tz = next_wake_datetime.tzinfo
         current_time = datetime.datetime.now(next_wake_datetime_tz)
         time_diff = next_wake_datetime - current_time
@@ -182,10 +229,23 @@ def main():
 
         threshold_time_diff = datetime.timedelta(seconds=10)
         zero_time = datetime.timedelta(seconds=0)
+
+        # Send time until next alarm to Arduino via serial
+        time_diff_list = str(time_diff).split(':')
+        secs = time_diff_list[2].split('.')[0]
+        msg = "Alarm in {}:{}:{}".format(time_diff_list[0], time_diff_list[1], secs) + "\n"
+        serial_service.write(msg.encode('utf-8'))
+
         if time_diff < threshold_time_diff and time_diff > zero_time:
             print("ALARM RAISED!")
-            alarm()
-        time.sleep(3)
+            alarm(serial_connection=serial_service)
+
+            # When alarm stopped, modify event summary of wake calendar event
+            # So it is not detected again
+            update_next_event(service=cal_service, calendar_id=calendar_id,
+                event_id=event_id, new_summary="x")
+
+        time.sleep(0.5)
 
 
 if __name__ == '__main__':
