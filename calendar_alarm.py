@@ -78,7 +78,12 @@ def get_events(service, calendar_id):
         print(start, event['summary'])
 
 def get_next_event(service, calendar_id, event_summary):
-
+    """Get time for desired next event in calendar.
+    
+    Finds the first event in the specified calendar whose event summary
+    starts with the specified 'event_summary'. Returns the start
+    date/time of that event as a datetime object and the id of that
+    event."""
     now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
     events_result = service.events().list(calendarId=calendar_id, timeMin=now,
                                         maxResults=50, singleEvents=True,
@@ -104,8 +109,10 @@ def get_next_event(service, calendar_id, event_summary):
             # Return the datetime obj and the event id
             return evt_datetime_obj, event['id']
 
-def update_next_event(service, calendar_id, event_id, new_summary):
-    """Append new_summary to summary of specified event."""
+def update_event_summary(service, calendar_id, event_id, new_summary):
+    """Append new_summary to summary of specified event.
+    
+    Return True if successful."""
     # Get event from API
     event = service.events().get(calendarId=calendar_id, eventId=event_id).execute()
     # Modify event summary (append new_summary to start)
@@ -115,7 +122,24 @@ def update_next_event(service, calendar_id, event_id, new_summary):
 
     return True
 
+def update_event_time(service, calendar_id, event_id, new_time):
+    """Update start time of specified event.
+    
+    Return True if successful."""
+    # Get event from API
+    event = service.events().get(calendarId=calendar_id, eventId=event_id).execute()
+    # Update to given new_time (must be in RFC 3339 format)
+    event['start']['dateTime'] = new_time
+    updated_event = service.events().update(calendarId=calendar_id, eventId=event['id'], body=event).execute()
+    return True
+
 def alarm(serial_connection):
+    """Activate the alarm.
+    
+    Play music/radio, send 'wake up' message to Arduino, wait for
+    message from Arduino to stop or snooze the alarm. Return
+    'stop' or 'snooze'."""
+
     ser = serial_connection
     try:
         smartplug(True)
@@ -123,7 +147,9 @@ def alarm(serial_connection):
         print("Unable to turn on smart plug.")
     
     try:
+        # Set volume to 100%
         subprocess.call(["bash", "configure_audio.sh"])
+        # Play BBC Radio 1 using VLC
         # player = vlc.MediaPlayer("eight.mp3")
         player = vlc.MediaPlayer("http://bbcmedia.ic.llnwd.net/stream/bbcmedia_radio1_mf_p")
         player.play()
@@ -131,23 +157,29 @@ def alarm(serial_connection):
         print("Unable to play music via VLC.")
 
     # Show message on LCD
-    msg = "--WAKE UP NOW!--"
+    msg = "--WAKE UP NOW!--\n"
     ser.write(msg.encode('utf-8'))
 
-    # Alarm lasts for at least 5 seconds before accepting stop button
+    # Alarm lasts for at least 5 seconds before accepting stop/snooze button
     time.sleep(5)
     while True:
         if ser.in_waiting > 0:
             line = ser.readline().decode('utf-8').rstrip()
-            if line == "State changed from LOW to HIGH":
-                # Button pressed so stop alarm
+            if line == "stop" or line == "snooze":
+                # Stop alarm
                 player.stop()
                 smartplug(False)
-                return True
+                # Refresh the 2nd row of LCD
+                ser.write("                ".encode('utf-8'))
+                # Return either 'stop' or 'snooze'
+                return line
 
 
 def send_email(recipient, subject, content=''):
-    """Send an email."""
+    """Send an email with specified content.
+    
+    Return True if email sent successfully, else
+    return False."""
     # Create headers
     headers = ["From: " + GMAIL_USERNAME, "Subject: " + subject, "To: " + recipient,
                                "MIME-Version: 1.0", "Content-Type: text/html"]
@@ -189,10 +221,11 @@ def smartplug(on=True):
 def connect_arduino():
     """Find Arduino port and return serial object."""
     # Serial connection
+    # Try /dev/ttyACM0 through /dev/ttyACM9
     for i in range(10):
         try:
             port = '/dev/ttyACM' + str(i)
-            ser = serial.Serial(port, 9600, timeout=1)
+            ser = serial.Serial(port, 9600, timeout=1, write_timeout=5)
             ser.flush()
             print("Successfully connected to Arduino on port {}".format(port))
             return ser
@@ -233,17 +266,39 @@ def main():
         # Send time until next alarm to Arduino via serial
         time_diff_list = str(time_diff).split(':')
         secs = time_diff_list[2].split('.')[0]
-        msg = "Alarm in {}:{}:{}".format(time_diff_list[0], time_diff_list[1], secs) + "\n"
-        serial_service.write(msg.encode('utf-8'))
+        msg = "Alarm: {}:{}:{}\n".format(time_diff_list[0], time_diff_list[1], secs)
+        try:
+            serial_service.write(msg.encode('utf-8'))
+        except serial.serialutil.SerialTimeoutException:
+            pass
+        
+        # Send current time to Arduino via serial
+        # Only send the time (not date) in format hrs:mins:secs
+        current_time_trimmed = (str(current_time).split(' ')[1]).split('.')[0]
+        current_time_msg = "Time: {}\n".format(current_time_trimmed)
+        try:
+            serial_service.write(current_time_msg.encode('utf-8'))
+        except serial.serialutil.SerialTimeoutException:
+            pass
 
+        # Check if time to sound alarm
         if time_diff < threshold_time_diff and time_diff > zero_time:
             print("ALARM RAISED!")
-            alarm(serial_connection=serial_service)
-
-            # When alarm stopped, modify event summary of wake calendar event
-            # So it is not detected again
-            update_next_event(service=cal_service, calendar_id=calendar_id,
-                event_id=event_id, new_summary="x")
+            alarm_status = alarm(serial_connection=serial_service)
+            
+            if alarm_status == "stop":
+                # When alarm stopped, modify event summary of wake calendar event
+                # So it is not detected again
+                print("Stopped alarm")
+                update_event_summary(service=cal_service, calendar_id=calendar_id,
+                    event_id=event_id, new_summary="x")
+            elif alarm_status == "snooze":
+                print("Snooze for 5 mins")
+                # https://stackoverflow.com/questions/8556398/generate-rfc-3339-timestamp-in-python/39418771#39418771
+                # 5 mins (300 secs) snooze time
+                snooze_time = (datetime.datetime.now(next_wake_datetime_tz) + datetime.timedelta(seconds=300)).isoformat()
+                update_event_time(service=cal_service, calendar_id=calendar_id,
+                    event_id=event_id, new_time=snooze_time)
 
         time.sleep(0.5)
 
