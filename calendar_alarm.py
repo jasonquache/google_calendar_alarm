@@ -252,56 +252,62 @@ def main():
     serial_service = connect_arduino()
 
     # Check every 0.5 seconds
-    while True:        
-        next_wake_datetime, event_id = get_next_event(cal_service, calendar_id, 'Wake')
-        next_wake_datetime_tz = next_wake_datetime.tzinfo
-        current_time = datetime.datetime.now(next_wake_datetime_tz)
-        time_diff = next_wake_datetime - current_time
+    while True:
+        # Try and get time of next event from calendar
+        try:        
+            next_wake_datetime, event_id = get_next_event(cal_service, calendar_id, 'Wake')
+            next_wake_datetime_tz = next_wake_datetime.tzinfo
+            current_time = datetime.datetime.now(next_wake_datetime_tz)
+            time_diff = next_wake_datetime - current_time
 
-        print("Next alarm start time: {}".format(next_wake_datetime))
-        print("Current time: {}".format(current_time))
-        print("Time difference: {}".format(time_diff))
-        print("")
+            print("Next alarm start time: {}".format(next_wake_datetime))
+            print("Current time: {}".format(current_time))
+            print("Time difference: {}".format(time_diff))
+            print("")
 
-        threshold_time_diff = datetime.timedelta(seconds=10)
-        zero_time = datetime.timedelta(seconds=0)
+            threshold_time_diff = datetime.timedelta(seconds=10)
+            zero_time = datetime.timedelta(seconds=0)
 
-        # Send time until next alarm to Arduino via serial
-        time_diff_list = str(time_diff).split(':')
-        secs = time_diff_list[2].split('.')[0]
-        msg = "Alarm: {}:{}:{}\n".format(time_diff_list[0], time_diff_list[1], secs)
-        try:
-            serial_service.write(msg.encode('utf-8'))
-        except serial.serialutil.SerialTimeoutException:
-            pass
+            # Send time until next alarm to Arduino via serial
+            time_diff_list = str(time_diff).split(':')
+            secs = time_diff_list[2].split('.')[0]
+            msg = "Alarm: {}:{}:{}\n".format(time_diff_list[0], time_diff_list[1], secs)
+            try:
+                serial_service.write(msg.encode('utf-8'))
+            except serial.serialutil.SerialTimeoutException:
+                pass
+
+            # Send current date/time to Arduino via serial
+            current_time_msg = current_time.strftime("Time: %a %d  %H:%M:%S\n")
+            print("CURRENT TIME ", current_time_msg)
+            try:
+                serial_service.write(current_time_msg.encode('utf-8'))
+            except serial.serialutil.SerialTimeoutException:
+                pass
+
+            # Check if time to sound alarm
+            if time_diff < threshold_time_diff and time_diff > zero_time:
+                print("ALARM RAISED!")
+                alarm_status = alarm(serial_connection=serial_service)
+                
+                if alarm_status == "stop":
+                    # When alarm stopped, modify event summary of wake calendar event
+                    # So it is not detected again
+                    print("Stopped alarm")
+                    update_event_summary(service=cal_service, calendar_id=calendar_id,
+                        event_id=event_id, new_summary="x")
+                elif alarm_status == "snooze":
+                    print("Snooze for 5 mins")
+                    # https://stackoverflow.com/questions/8556398/generate-rfc-3339-timestamp-in-python/39418771#39418771
+                    # 5 mins (300 secs) snooze time
+                    snooze_time = (datetime.datetime.now(next_wake_datetime_tz) + datetime.timedelta(seconds=300)).isoformat()
+                    update_event_time(service=cal_service, calendar_id=calendar_id,
+                        event_id=event_id, new_time=snooze_time)
         
-        # Send current time to Arduino via serial
-        # Only send the time (not date) in format hrs:mins:secs
-        current_time_msg = current_time.strftime("Time: %a %d  %H:%M:%S\n")
-        print("CURRENT TIME ", current_time_msg)
-        try:
-            serial_service.write(current_time_msg.encode('utf-8'))
-        except serial.serialutil.SerialTimeoutException:
+        except Exception:
+            # Assume HTTP error (backend error from Google Calendar)
+            # TODO - change this to catch specific exception in future
             pass
-
-        # Check if time to sound alarm
-        if time_diff < threshold_time_diff and time_diff > zero_time:
-            print("ALARM RAISED!")
-            alarm_status = alarm(serial_connection=serial_service)
-            
-            if alarm_status == "stop":
-                # When alarm stopped, modify event summary of wake calendar event
-                # So it is not detected again
-                print("Stopped alarm")
-                update_event_summary(service=cal_service, calendar_id=calendar_id,
-                    event_id=event_id, new_summary="x")
-            elif alarm_status == "snooze":
-                print("Snooze for 5 mins")
-                # https://stackoverflow.com/questions/8556398/generate-rfc-3339-timestamp-in-python/39418771#39418771
-                # 5 mins (300 secs) snooze time
-                snooze_time = (datetime.datetime.now(next_wake_datetime_tz) + datetime.timedelta(seconds=300)).isoformat()
-                update_event_time(service=cal_service, calendar_id=calendar_id,
-                    event_id=event_id, new_time=snooze_time)
 
         time.sleep(0.5)
 
