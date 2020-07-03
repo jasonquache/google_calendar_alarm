@@ -162,6 +162,9 @@ def alarm(serial_connection):
 
     # Alarm lasts for at least 5 seconds before accepting stop/snooze button
     time.sleep(5)
+    # Send a message to Arduino to tell it to start sending 'stop'/'snooze'
+    # on button presses
+    ser.write("button\n".encode('utf-8'))
     while True:
         if ser.in_waiting > 0:
             line = ser.readline().decode('utf-8').rstrip()
@@ -274,8 +277,8 @@ def main():
         
         # Send current time to Arduino via serial
         # Only send the time (not date) in format hrs:mins:secs
-        current_time_trimmed = (str(current_time).split(' ')[1]).split('.')[0]
-        current_time_msg = "Time: {}\n".format(current_time_trimmed)
+        current_time_msg = current_time.strftime("Time: %a %d  %H:%M:%S\n")
+        print("CURRENT TIME ", current_time_msg)
         try:
             serial_service.write(current_time_msg.encode('utf-8'))
         except serial.serialutil.SerialTimeoutException:
