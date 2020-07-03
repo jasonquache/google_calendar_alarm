@@ -21,17 +21,11 @@ LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 /* The stop alarm button:
     Button connected to pin 8 */
 const int stopbuttonPin = 8;
-// int stopbuttonState = 0;  // Variable for reading button status
-// int last_stopbutton_state = HIGH;
-// int current_stopbutton_state;
 Bounce stop_debouncer = Bounce();
 
 /* The snooze alarm button:
     Button connected to pin 9*/
 const int snoozebuttonPin = 9;
-// int snoozebuttonState = 0;
-// int last_snoozebutton_state = HIGH;
-// int current_snoozebutton_state;
 Bounce snooze_debouncer = Bounce();
 
 
@@ -120,15 +114,10 @@ void setup() {
 
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
-  // Print a message to the LCD.
-  // lcd.setCursor(0, 0);
-  // lcd.print("| Alarm  Clock |");
 
   // Intialise the button pins as inputs
-  // pinMode(stopbuttonPin, INPUT_PULLUP);
   stop_debouncer.attach(stopbuttonPin, INPUT_PULLUP);
   stop_debouncer.interval(25);
-  // pinMode(snoozebuttonPin, INPUT_PULLUP);
   snooze_debouncer.attach(snoozebuttonPin, INPUT_PULLUP);
   snooze_debouncer.interval(25);
   pinMode(ledPin, OUTPUT);
@@ -158,56 +147,5 @@ void loop() {
       accept_button = false;
     }
   }
-  
-
-  // current_stopbutton_state = digitalRead(stopbuttonPin);
-  // current_snoozebutton_state = digitalRead(snoozebuttonPin);
-
-  // if (last_stopbutton_state == LOW && current_stopbutton_state == HIGH)
-  // {
-  //   Serial.println("stop");
-  // }
-
-  // else if (last_snoozebutton_state == LOW && current_snoozebutton_state == HIGH)
-  // {
-  //   Serial.println("snooze");
-  // }
-
-  // // Update button states
-  // last_stopbutton_state = current_stopbutton_state;
-  // last_snoozebutton_state = current_snoozebutton_state;
-
-
-
-  // //** Serial input from RPi **//
-  // if (Serial.available() > 0)
-  // {
-  //   data = Serial.readStringUntil('\n');
-  //   // Serial.print("From RPi: ");
-  //   // Serial.println(data);
-
-  //   // Print to LCD
-  //   if (data.startsWith("Time")) {
-  //     // Must be the current time so print it on top row
-  //     lcd.setCursor(0, 0);
-  //   }
-  //   else {
-  //     // Must be time to next alarm so print it on 2nd row
-  //     // Or 'Wake up now' message
-  //     lcd.setCursor(0, 1);
-  //   }
-  //   // print nothing to reset it
-  //   // lcd.print("                ");
-  //   lcd.print(data);
-  // }
-
-
-  //** LCD display **//
-  // set the cursor to column 0, line 1
-  // (note: line 1 is the second row, since counting begins with 0):
-  // lcd.setCursor(0, 1);
-  // print the number of seconds since reset:
-  // lcd.print(millis() / 1000);
-
 
 }
