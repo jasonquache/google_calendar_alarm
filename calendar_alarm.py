@@ -143,6 +143,7 @@ def alarm(serial_connection):
     ser = serial_connection
     try:
         smartplug(True)
+        smartlight('cool', 100)  # Turn on light (cool white, 100% brightness)
     except Exception:
         print("Unable to turn on smart plug.")
     
@@ -172,6 +173,7 @@ def alarm(serial_connection):
                 # Stop alarm
                 player.stop()
                 smartplug(False)
+                smartlight('off')
                 # Refresh the 2nd row of LCD
                 ser.write("                ".encode('utf-8'))
                 # Return either 'stop' or 'snooze'
@@ -220,6 +222,15 @@ def smartplug(on=True):
     
     return send_email(recipient='trigger@applet.ifttt.com', subject=subject)
 
+def smartlight(mode, brightness=100):
+    """Activate light by sending email."""
+    options = {
+        ('cool', 100): '#jason-light-cool-100',
+        ('warm', 100): '#jason-light-warm-100',
+        ('off', 100): '#jason-light-off'
+    }
+    return send_email(recipient='trigger@applet.ifttt.com', 
+        subject=options[(mode, brightness)])
 
 def connect_arduino():
     """Find Arduino port and return serial object."""
@@ -243,6 +254,7 @@ def main():
     """Shows basic usage of the Google Calendar API.
     Prints the start and name of the next 10 events on the user's calendar.
     """
+    
     cal_service = build_calendar()
 
     # 'Daily Scheduling' Google Calendar
@@ -271,14 +283,19 @@ def main():
             # Send time until next alarm to Arduino via serial
             time_diff_list = str(time_diff).split(':')
             secs = time_diff_list[2].split('.')[0]
-            msg = "Alarm: {}:{}:{}\n".format(time_diff_list[0], time_diff_list[1], secs)
+            # Hack to ensure the last char on LCD is cleared if required
+            if len(time_diff_list[0]) > 1:
+                msg = "Alarm: {}:{}:{} \n".format(time_diff_list[0], time_diff_list[1], secs)
+            else:
+                msg = "Alarm: {}:{}:{}  \n".format(time_diff_list[0], time_diff_list[1], secs)
             try:
                 serial_service.write(msg.encode('utf-8'))
             except serial.serialutil.SerialTimeoutException:
                 pass
 
             # Send current date/time to Arduino via serial
-            current_time_msg = current_time.strftime("Time: %a %d  %H:%M:%S\n")
+            # current_time_msg = current_time.strftime("Time: %a %d  %H:%M:%S\n")
+            current_time_msg = current_time.strftime("Time: %a %d/%m  %H:%M\n")
             print("CURRENT TIME ", current_time_msg)
             try:
                 serial_service.write(current_time_msg.encode('utf-8'))
