@@ -250,11 +250,7 @@ def connect_arduino():
     return None
         
 
-def main():
-    """Shows basic usage of the Google Calendar API.
-    Prints the start and name of the next 10 events on the user's calendar.
-    """
-    
+def main():    
     cal_service = build_calendar()
 
     # 'Daily Scheduling' Google Calendar
