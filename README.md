@@ -8,6 +8,8 @@ Clone the repository (to your Rapsberry Pi). Install the prerequisites using pip
 
 1) You will need to set-up your Google Account to allow making requests to the Google Calendar API - see steps 1 and 2 here: https://developers.google.com/calendar/quickstart/python
 
+2) Alarms are set using events which begin with the word 'wake'/'Wake' - the program will look for events beginning with 'wake' in the calendar that you specify. The calendar is specified inside `config.py`, as the `CALENDAR_ID` variable which must be set to the ID of the calendar (the ID can be found in your Google Calendar settings page).
+
 2) You will need an email account which is used to send emails to IFTTT. At the moment the email and password need to be saved as plain text in the email_creds.json file (hence it is best to create a new Gmail account rather than use your usual one)
 
 3) IFTTT needs to be configured to run whatever smart devices you want upon receiving emails with subject lines:
