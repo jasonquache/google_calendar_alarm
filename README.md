@@ -27,3 +27,7 @@ Run the alarm clock on your Raspberry Pi:
 ```
 pipenv run python run_cal_alarm.py
 ```
+or you can specify verbose mode (will print event information whilst program is running):
+```
+pipenv run python run_cal_alarm.py -v
+```
