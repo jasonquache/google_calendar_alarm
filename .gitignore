@@ -3,3 +3,12 @@ LCD_Time/.vscode
 LCD_Time/.travis.yml
 LCD_Time/.DS_STORE
 .DS_STORE
+.vscode
+Pipfile.lock
+nohup.out
+token.pickle
+credentials.json
+cronlogs
+__pycache__
+start_gcal_alarm_on_boot.sh
+misc_files/
