@@ -11,10 +11,8 @@ SCOPES = ['https://www.googleapis.com/auth/calendar']
 # This is my 'Daily Scheduling' calendar
 CALENDAR_ID = "fcmfp298b0pd6a5rc27opganqs@group.calendar.google.com"
 
-# Email Variables
+# Email Variables (for sending emails to IFTTT)
 SMTP_SERVER = 'smtp.gmail.com' # Email Server
 SMTP_PORT = 587 # Server Port
-email_creds = json.load(
-    open("email_credentials.json"), object_pairs_hook=dict)
-GMAIL_USERNAME = email_creds["GMAIL_USERNAME"]
-GMAIL_PASSWORD = email_creds["GMAIL_PASSWORD"]
+GMAIL_USERNAME = "your_email@gmail.com"
+GMAIL_PASSWORD = "your_password"
