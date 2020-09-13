@@ -18,7 +18,7 @@ def main():
     if "-v" in opts:
         verbose = True
 
-
+    # Set up connection to Google Calendar
     cal_service = cal.build_calendar()
 
     # Serial connection

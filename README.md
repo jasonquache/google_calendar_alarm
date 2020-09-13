@@ -6,11 +6,11 @@ A 'smart' alarm clock designed to run on a Raspberry Pi in conjunction with an A
 
 Clone the repository (to your Rapsberry Pi). Install the prerequisites using pipenv (using the Pipfile provided).
 
-1) You will need to set-up your Google Account to allow making requests to the Google Calendar API - see steps 1 and 2 here: https://developers.google.com/calendar/quickstart/python
+1) You will need to set-up your Google Account to allow making requests to the Google Calendar API - see step 1 here: https://developers.google.com/calendar/quickstart/python where you can generate your `credentials.json` file which will need to be saved in the working directory.
 
 2) Alarms are set using events which begin with the word 'wake'/'Wake' - the program will look for events beginning with 'wake' in the calendar that you specify. The calendar is specified inside `config.py`, as the `CALENDAR_ID` variable which must be set to the ID of the calendar (the ID can be found in your Google Calendar settings page).
 
-2) You will need an email account which is used to send emails to IFTTT. At the moment the email and password need to be saved as plain text in the email_creds.json file (hence it is best to create a new Gmail account rather than use your usual one)
+2) You will need an email account which is used to send emails to IFTTT. At the moment the email and password need to be saved as plain text in the `config.py` file as the `GMAIL_USERNAME` and `GMAIL_PASSWORD` variables (hence it is best to create a new Gmail account rather than use your usual one)
 
 3) IFTTT needs to be configured to run whatever smart devices you want upon receiving emails with subject lines:
 `#smartplugon`, `#smartplugoff` (others can be found inside the `smartplug` and `smartlight` functions inside the `alarm.py` module - these subject lines can be modified to suit your smart device)
